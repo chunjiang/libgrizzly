@@ -93,8 +93,13 @@ libusb_device_handle* find_grizzly(libusb_context* ctx, unsigned char addr) {
 	return NULL;
 }
 
-void grizzly_init() {
-
+libusb_device_handle* grizzly_init(libusb_context* ctx, unsigned char device_addr) {
+	libusb_device_handle* device = find_grizzly(ctx, device_addr);
+	grizzly_write_as_int(device, ADDR_ENABLEUSB, 1, 1);
+	if (device == NULL) {
+		printf("Could not find grizzly\n");
+	}
+	return device;
 }
 
 void grizzly_write_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num) {
@@ -244,4 +249,20 @@ unsigned char grizzly_addr_to_id(unsigned char addr) {
 
 unsigned char grizzly_id_to_addr(unsigned char id) {
 	return 0x0f - id;
+}
+
+int grizzly_enable(libusb_device_handle* dev) {
+	unsigned char mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
+	mode |= 0x01;
+	grizzly_write_single_register(dev, ADDR_MODE, mode);
+	grizzly_write_single_register(dev, ADDR_UPDATE, 0x00);
+	mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
+
+	return mode & 0x01;
+}
+
+void grizzly_disable(libusb_device_handle* dev) {
+	unsigned char mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
+	mode &= (0xff - 0x01);
+	grizzly_write_single_register(dev, ADDR_MODE, mode);
 }

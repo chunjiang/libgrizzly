@@ -20,56 +20,36 @@ int main(void) {
 		return -1;
 	}
 
-	// Assume only 1 grizzly
-	libusb_device_handle* device = find_grizzly(ctx, 0x0f);
-
+	libusb_device_handle* device = grizzly_init(ctx, 0x0f);
 	if (device == NULL) {
-		printf("Could not find grizzly\n");
 		return -1;
 	}
 
-	unsigned char read_count[4] = {0, 0, 0, 0};
-	unsigned char write_count[4] = {0, 0, 0, 0};
-	grizzly_write_registers(device, 0x80, (unsigned char*)"\x00\x00", 2);
-	grizzly_write_registers(device, 0x01, (unsigned char*)"\x03\x00\x00\x00\x00\x00\x00\x00", 8);
+	if (!grizzly_enable(device)) {
+		printf("Failed to enable.\n");
+	}
+	grizzly_set_mode(device, CMODE_NO_PID, DMODE_DRIVE_COAST);
+	grizzly_set_target(device, 0.);
+
+	grizzly_limit_acceleration(device, 20);
+	grizzly_limit_current(device, 1);
+
+	grizzly_init_pid(device, 5, 3, 1);
+	float pidconstants[3];
+	grizzly_read_pid_constants(device, pidconstants);
+	printf("kP: %d, kI: %d, kD: %d\n", (int)pidconstants[0], (int)pidconstants[1], (int)pidconstants[2]);
+
 	int s = 0;
 	while (1) {
-/*
-		grizzly_read_registers(device, 0x20, read_count, 4);
-		int cycles = 0;
-		for (int i = 0; i < 4; i++) {
-			cycles |= (int)(read_count[i] << (8 * i));
-		}
-		printf("Time %d ", cycles);
-
-		int cnt = 0;
-		if (cycles > 5000) {
-			cnt = grizzly_send_bytes(device, "\x20\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
-			//grizzly_set_registers(device, 0x20, write_count, 4);
-		}
-
-		unsigned char mode;
-		grizzly_read_registers(device, 0x09, &mode, 1);
-		printf("%d\n", mode);
-		unsigned char zero_mode = 0;
-		unsigned char non_mode = 4;
-		if (cycles > 5000) {
-			grizzly_set_registers(device, 0x01, &zero_mode, 1);
-		} else {
-			grizzly_set_registers(device, 0x01, &non_mode, 1);
-		}
-
-		grizzly_set_registers(device, 0x08, &zero_mode, 1);
-*/
-		// Set 0 timeout
-
 		// Set drive mode and 25% pwm
 		grizzly_set_target(device, -s);
-		unsigned char buf[1];
-		grizzly_read_registers(device, 0x09, buf, 1);
-		int mode = buf[0];
-		int speed = grizzly_read_as_int(device, 0x0c, 4);
-		printf("Mode: %d, Speed %d, %d\n", mode, speed / 65536, s);
+
+		unsigned char mode = grizzly_read_single_register(device, 0x09);
+		float current = grizzly_read_current(device);
+		int ticks = grizzly_read_encoder(device);
+		int speed = grizzly_read_as_int(device, 0x0c, 4) / 65536;
+
+		printf("Mode: %d, Speed: %d, Current: %f, Count: %d\n", mode, speed, current, ticks);
 		s = (s + 1) % 101;
 		sleep(1);
 	}

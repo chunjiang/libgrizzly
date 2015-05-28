@@ -41,6 +41,7 @@
 
 #define		DEFAULT_TIMEOUT						500
 
+libusb_device_handle* grizzly_init(libusb_context* ctx, unsigned char device_addr);
 void print_vendor_product(libusb_device *dev);
 int is_grizzly(libusb_device *dev);
 int grizzly_send_bytes(libusb_device_handle* dev, unsigned char* cmd);
@@ -64,5 +65,7 @@ void grizzly_init_pid(libusb_device_handle* dev, float kp, float ki, float kd);
 void grizzly_read_pid_constants(libusb_device_handle* dev, float* constants);
 unsigned char grizzly_addr_to_id(unsigned char addr);
 unsigned char grizzly_id_to_addr(unsigned char id);
+int grizzly_enable(libusb_device_handle* dev);
+void grizzly_disable(libusb_device_handle* dev);
 
 #endif /* LIBGRIZZLY_H_ */
