@@ -16,6 +16,9 @@
 
 #define    ADDR_MODE                            0x01
 #define    ADDR_SPEED                           0x04
+#define    ADDR_UPDATE							0x08
+#define	   ADDR_MODE_RO							0x09
+#define    ADDR_SPEED_RO						0x0C
 #define    ADDR_MOTORCURRENT                    0x10
 #define    ADDR_ENCODERCOUNT                    0x20
 #define    ADDR_PCONSTANT                       0x30
@@ -44,8 +47,22 @@ int grizzly_send_bytes(libusb_device_handle* dev, unsigned char* cmd);
 int grizzly_exchange_bytes(libusb_device_handle* dev, unsigned char* cmd, unsigned char* rtn);
 libusb_device_handle* find_grizzly(libusb_context* ctx, unsigned char addr);
 ssize_t get_all_grizzlies(libusb_context* ctx, libusb_device_handle** handles);
-void grizzly_set_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num);
+void grizzly_write_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num);
+void grizzly_write_single_register(libusb_device_handle* dev, unsigned char addr, unsigned char data);
 void grizzly_read_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num);
-
+unsigned char grizzly_read_single_register(libusb_device_handle* dev, unsigned char addr);
+int grizzly_read_as_int(libusb_device_handle* dev, unsigned char addr, int num);
+void grizzly_write_as_int(libusb_device_handle* dev, unsigned char addr, int val, int num);
+void grizzly_set_target(libusb_device_handle* dev, float setpoint);
+void grizzly_set_mode(libusb_device_handle* dev, char cmode, char dmode);
+float grizzly_read_current(libusb_device_handle* dev);
+int grizzly_read_encoder(libusb_device_handle* dev);
+void grizzly_write_encoder(libusb_device_handle* dev, int new_val);
+void grizzly_limit_acceleration(libusb_device_handle* dev, int new_val);
+void grizzly_limit_current(libusb_device_handle* dev, int new_val);
+void grizzly_init_pid(libusb_device_handle* dev, float kp, float ki, float kd);
+void grizzly_read_pid_constants(libusb_device_handle* dev, float* constants);
+unsigned char grizzly_addr_to_id(unsigned char addr);
+unsigned char grizzly_id_to_addr(unsigned char id);
 
 #endif /* LIBGRIZZLY_H_ */

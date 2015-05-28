@@ -35,7 +35,7 @@ int grizzly_exchange_bytes(libusb_device_handle* dev, unsigned char* cmd, unsign
 
 	uint16_t num_bytes = cmd[1] & 0x7f;
 	unsigned char temp[num_bytes + 1];
-	err = libusb_control_transfer(dev, 0xa1, 0x01, 0x0301, 0, &temp, num_bytes + 1, DEFAULT_TIMEOUT);
+	err = libusb_control_transfer(dev, 0xa1, 0x01, 0x0301, 0, temp, num_bytes + 1, DEFAULT_TIMEOUT);
 
 	for (int i = 0; i < num_bytes; i++) {
 		rtn[i] = temp[i + 1];
@@ -97,7 +97,7 @@ void grizzly_init() {
 
 }
 
-void grizzly_set_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num) {
+void grizzly_write_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num) {
 	if (num > 14) {
 		printf("Cannot write more than 14 bytes at a time.\n");
 	} else {
@@ -110,9 +110,13 @@ void grizzly_set_registers(libusb_device_handle* dev, unsigned char addr, unsign
 		for (int i = 0; i < num; i++) {
 			buffer[i + 2] = data[i];
 		}
-		int cnt = grizzly_send_bytes(dev, buffer);
+		grizzly_send_bytes(dev, buffer);
 		//printf("%d bytes written\n", cnt);
 	}
+}
+
+void grizzly_write_single_register(libusb_device_handle* dev, unsigned char addr, unsigned char data) {
+	grizzly_write_registers(dev, addr, &data, 1);
 }
 
 void grizzly_read_registers(libusb_device_handle* dev, unsigned char addr, unsigned char* data, int num) {
@@ -129,4 +133,115 @@ void grizzly_read_registers(libusb_device_handle* dev, unsigned char addr, unsig
 
 		grizzly_exchange_bytes(dev, buffer, data);
 	}
+}
+
+unsigned char grizzly_read_single_register(libusb_device_handle* dev, unsigned char addr) {
+	unsigned char rtn;
+	grizzly_read_registers(dev, addr, &rtn, 1);
+	return rtn;
+}
+
+int grizzly_read_as_int(libusb_device_handle* dev, unsigned char addr, int num) {
+	if (num > 4) {
+		printf ("Cannot read int greater than 4 bytes. Truncating to 4.\n");
+		num = 4;
+	}
+	unsigned char buf[num];
+	grizzly_read_registers(dev, addr, buf, num);
+
+	int rtn = 0;
+	for (int i = 0; i < num; i++) {
+		rtn |= (buf[i] << (8 * i));
+	}
+	return rtn;
+}
+
+void grizzly_write_as_int(libusb_device_handle* dev, unsigned char addr, int val, int num) {
+	unsigned char buf[4];
+	for (int i = 0; i < 4; i++) {
+		buf[i] = (val >> (8 * i)) & 0xff;
+	}
+
+	grizzly_write_registers(dev, addr, buf, 4);
+}
+
+void grizzly_set_target(libusb_device_handle* dev, float setpoint) {
+	int fixed_setpoint = (int)(setpoint * 65536);
+	unsigned char buf[5];
+	for (int i = 0; i < 5; i++) {
+		buf[i] = (fixed_setpoint >> (8 * i)) & 0xff;
+	}
+	grizzly_write_registers(dev, ADDR_SPEED, buf, 5);
+}
+
+void grizzly_set_mode(libusb_device_handle* dev, char cmode, char dmode) {
+	unsigned char buf[2];
+	buf[0] = grizzly_read_single_register(dev, ADDR_MODE_RO);
+	buf[0] &= 0x01; // Get enable bit
+	buf[0] |= cmode | dmode;
+	grizzly_write_registers(dev, ADDR_MODE, buf, 2);
+}
+
+float grizzly_read_current(libusb_device_handle* dev) {
+	int raw_adc = grizzly_read_as_int(dev, ADDR_MOTORCURRENT, 2);
+	return (5.0 / 1024.0) * (1000.0 / 66.0) * (raw_adc - 511);
+}
+
+int grizzly_read_encoder(libusb_device_handle* dev) {
+	return grizzly_read_as_int(dev, ADDR_ENCODERCOUNT, 4);
+}
+
+void grizzly_write_encoder(libusb_device_handle* dev, int new_val) {
+	grizzly_write_as_int(dev, ADDR_ENCODERCOUNT, new_val, 4);
+}
+
+void grizzly_limit_acceleration(libusb_device_handle* dev, int new_val) {
+	if (new_val > 142) {
+		printf("Acceleration limit cannot exceed 142. Clamping value to 142.\n");
+		new_val = 142;
+	}
+	if (new_val <= 0) {
+		printf("Acceleration limit must be positive. Clamping value to 0.");
+		new_val = 0;
+	}
+
+	grizzly_write_as_int(dev, ADDR_ACCELLIMIT, new_val, 1);
+}
+
+void grizzly_limit_current(libusb_device_handle* dev, int new_val) {
+	if (new_val <= 0) {
+		printf("Current limit must be a positive number. Clamping value to 0.");
+		new_val = 0;
+	}
+
+	int adc_val = (int)(new_val * (1024.0 / 5.0) * (66.0 / 1000.0));
+	grizzly_write_as_int(dev, ADDR_CURRENTLIMIT, adc_val, 2);
+}
+
+void grizzly_init_pid(libusb_device_handle* dev, float kp, float ki, float kd) {
+	int p = (int)(kp * 65536);
+	int i = (int)(ki * 65536);
+	int d = (int)(kd * 65536);
+
+	grizzly_write_as_int(dev, ADDR_PCONSTANT, p, 4);
+	grizzly_write_as_int(dev, ADDR_ICONSTANT, i, 4);
+	grizzly_write_as_int(dev, ADDR_DCONSTANT, d, 4);
+}
+
+void grizzly_read_pid_constants(libusb_device_handle* dev, float* constants) {
+	int p = grizzly_read_as_int(dev, ADDR_PCONSTANT, 4);
+	int i = grizzly_read_as_int(dev, ADDR_ICONSTANT, 4);
+	int d = grizzly_read_as_int(dev, ADDR_DCONSTANT, 4);
+
+	constants[0] = (float)(p / 65536.0);
+	constants[1] = (float)(i / 65536.0);
+	constants[2] = (float)(d / 65536.0);
+}
+
+unsigned char grizzly_addr_to_id(unsigned char addr) {
+	return 0x0f - addr;
+}
+
+unsigned char grizzly_id_to_addr(unsigned char id) {
+	return 0x0f - id;
 }
