@@ -95,10 +95,11 @@ libusb_device_handle* find_grizzly(libusb_context* ctx, unsigned char addr) {
 
 libusb_device_handle* grizzly_init(libusb_context* ctx, unsigned char device_addr) {
 	libusb_device_handle* device = find_grizzly(ctx, device_addr);
-	grizzly_write_as_int(device, ADDR_ENABLEUSB, 1, 1);
 	if (device == NULL) {
 		printf("Could not find grizzly\n");
+		return NULL;
 	}
+	grizzly_write_as_int(device, ADDR_ENABLEUSB, 1, 1);
 	return device;
 }
 
@@ -107,7 +108,7 @@ void grizzly_write_registers(libusb_device_handle* dev, unsigned char addr, unsi
 		printf("Cannot write more than 14 bytes at a time.\n");
 	} else {
 		unsigned char buffer[16];
-		for (int i = 0; i < 16; i++) {
+		for (int i = 2; i < 16; i++) {
 			buffer[i] = 0;
 		}
 		buffer[0] = addr;
@@ -129,8 +130,11 @@ void grizzly_read_registers(libusb_device_handle* dev, unsigned char addr, unsig
 		printf("Cannot read more than 127 bytes at a time.\n");
 	} else {
 		unsigned char buffer[16];
+		for (int i = 2; i < 16; i++) {
+			buffer[i] = 0;
+		}
 		buffer[0] = addr;
-		buffer[1] = (unsigned char)num;
+		buffer[1] = (unsigned char)(num & 0xff);
 
 		for (int i = 0; i < num; i++) {
 			buffer[i + 2] = (unsigned char)0;
@@ -162,12 +166,12 @@ int grizzly_read_as_int(libusb_device_handle* dev, unsigned char addr, int num) 
 }
 
 void grizzly_write_as_int(libusb_device_handle* dev, unsigned char addr, int val, int num) {
-	unsigned char buf[4];
-	for (int i = 0; i < 4; i++) {
+	unsigned char buf[num];
+	for (int i = 0; i < num; i++) {
 		buf[i] = (val >> (8 * i)) & 0xff;
 	}
 
-	grizzly_write_registers(dev, addr, buf, 4);
+	grizzly_write_registers(dev, addr, buf, num);
 }
 
 void grizzly_set_target(libusb_device_handle* dev, float setpoint) {
@@ -180,11 +184,11 @@ void grizzly_set_target(libusb_device_handle* dev, float setpoint) {
 }
 
 void grizzly_set_mode(libusb_device_handle* dev, char cmode, char dmode) {
-	unsigned char buf[2];
-	buf[0] = grizzly_read_single_register(dev, ADDR_MODE_RO);
-	buf[0] &= 0x01; // Get enable bit
-	buf[0] |= cmode | dmode;
-	grizzly_write_registers(dev, ADDR_MODE, buf, 2);
+	unsigned char mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
+	mode &= 0x01; // Get enable bit
+	mode |= cmode | dmode;
+	grizzly_write_single_register(dev, ADDR_MODE, mode);
+	grizzly_write_single_register(dev, ADDR_UPDATE, 0);
 }
 
 float grizzly_read_current(libusb_device_handle* dev) {
@@ -265,4 +269,17 @@ void grizzly_disable(libusb_device_handle* dev) {
 	unsigned char mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
 	mode &= (0xff - 0x01);
 	grizzly_write_single_register(dev, ADDR_MODE, mode);
+}
+
+void grizzly_exit(libusb_device_handle* grizzly) {
+	libusb_attach_kernel_driver(grizzly, 0);
+	libusb_close(grizzly);
+}
+
+int grizzly_cleanup_all(libusb_context* ctx, libusb_device_handle** all_handles, int num_devices, int error) {
+	for (int i = 0; i < num_devices; i++) {
+		grizzly_exit(all_handles[i]);
+	}
+	libusb_exit(ctx);
+	return error;
 }

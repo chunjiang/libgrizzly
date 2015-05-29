@@ -67,5 +67,8 @@ unsigned char grizzly_addr_to_id(unsigned char addr);
 unsigned char grizzly_id_to_addr(unsigned char id);
 int grizzly_enable(libusb_device_handle* dev);
 void grizzly_disable(libusb_device_handle* dev);
+void grizzly_exit(libusb_device_handle* grizzly);
+int grizzly_cleanup_all(libusb_context* ctx, libusb_device_handle** all_handles, int num_devices, int error);
+
 
 #endif /* LIBGRIZZLY_H_ */
