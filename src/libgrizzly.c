@@ -13,6 +13,11 @@
 #include <libusb-1.0/libusb.h>
 #include "libgrizzly.h"
 
+/**
+ * Checks whether the given device corresponds to a grizzly.
+ * @param dev The device found by libusb that could be a grizzly.
+ * @return An integer, 1 if @dev is a grizzly, 0 otherwise.
+ */
 int is_grizzly(libusb_device *dev) {
 	struct libusb_device_descriptor desc;
 	int r = libusb_get_device_descriptor(dev, &desc);
@@ -23,6 +28,17 @@ int is_grizzly(libusb_device *dev) {
 	return (desc.idVendor == IDVENDOR) & (desc.idProduct == IDPRODUCT);
 }
 
+/**
+ * Low level wrapper over the libusb_control_transfer. Sends data to the device
+ * for writing.
+ * @param dev The device data is being written to.
+ * @param cmd A byte string "packet". Packet format looks like:
+ *       Byte 0:           Register
+ *       Byte 1 (bit 6:0): Length of data to read/write
+ *       Byte 1 (bit 7):   R/W flag (1 = write)
+ *       Byte 2-15:        Data
+ * @return If positive, the number of bytes written. If negative, some sort of error.
+ */
 int grizzly_send_bytes(libusb_device_handle* dev, unsigned char* cmd) {
 	return libusb_control_transfer(dev, 0x21, 0x09, 0x0300, 0, cmd, 16, DEFAULT_TIMEOUT);
 }
