@@ -122,10 +122,9 @@ libusb_device_handle* find_grizzly(libusb_context* ctx, unsigned char addr) {
 	libusb_device_handle* handles[10];
 	ssize_t num = get_all_grizzlies(ctx, handles);
 
-	unsigned char rtn_buffer[16];
 	for (int i = 0; i < num; i++) {
-		grizzly_exchange_bytes(handles[i], (unsigned char*)COMMAND_GET_ADDR, rtn_buffer);
-		if (addr == rtn_buffer[0] >> 1) {
+		unsigned char internal_addr = grizzly_read_single_register(handles[i], ADDR_ADDRESSLIST);
+		if (addr == internal_addr >> 1) {
 			printf("Successfully opened and detached\n");
 			return handles[i];
 		} else {
@@ -272,7 +271,7 @@ void grizzly_write_as_int(libusb_device_handle* dev, unsigned char addr, int val
  * @param setpoint The speed/position value to set.
  */
 void grizzly_set_target(libusb_device_handle* dev, float setpoint) {
-	int fixed_setpoint = (int)(setpoint * 65536);
+	int fixed_setpoint = float_to_fixed(setpoint);
 	unsigned char buf[5];
 	for (int i = 0; i < 5; i++) {
 		buf[i] = (fixed_setpoint >> (8 * i)) & 0xff;
@@ -363,9 +362,9 @@ void grizzly_limit_current(libusb_device_handle* dev, int new_val) {
  * @param kd The derivative term.
  */
 void grizzly_init_pid(libusb_device_handle* dev, float kp, float ki, float kd) {
-	int p = (int)(kp * 65536);
-	int i = (int)(ki * 65536);
-	int d = (int)(kd * 65536);
+	int p = float_to_fixed(kp);
+	int i = float_to_fixed(ki);
+	int d = float_to_fixed(kd);
 
 	grizzly_write_as_int(dev, ADDR_PCONSTANT, p, 4);
 	grizzly_write_as_int(dev, ADDR_ICONSTANT, i, 4);
@@ -382,9 +381,9 @@ void grizzly_read_pid_constants(libusb_device_handle* dev, float* constants) {
 	int i = grizzly_read_as_int(dev, ADDR_ICONSTANT, 4);
 	int d = grizzly_read_as_int(dev, ADDR_DCONSTANT, 4);
 
-	constants[0] = (float)(p / 65536.0);
-	constants[1] = (float)(i / 65536.0);
-	constants[2] = (float)(d / 65536.0);
+	constants[0] = fixed_to_float(p);
+	constants[1] = fixed_to_float(i);
+	constants[2] = fixed_to_float(d);
 }
 
 /**
@@ -454,4 +453,12 @@ int grizzly_cleanup_all(libusb_context* ctx, libusb_device_handle** all_handles,
 	}
 	libusb_exit(ctx);
 	return error;
+}
+
+float fixed_to_float(int fixed) {
+	return fixed / 65536.0;
+}
+
+int float_to_fixed(float f) {
+	return (int)(f * 65536.0);
 }

@@ -69,6 +69,7 @@ int grizzly_enable(libusb_device_handle* dev);
 void grizzly_disable(libusb_device_handle* dev);
 void grizzly_exit(libusb_device_handle* grizzly);
 int grizzly_cleanup_all(libusb_context* ctx, libusb_device_handle** all_handles, int num_devices, int error);
-
+float fixed_to_float(int);
+int float_to_fixed(float);
 
 #endif /* LIBGRIZZLY_H_ */
