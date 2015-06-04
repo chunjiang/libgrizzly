@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libusb-1.0/libusb.h>
-#include "libgrizzly.h"
+#include "include/libgrizzly.h"
 
 /**
  * Checks whether the given device corresponds to a grizzly.
@@ -416,6 +416,7 @@ int grizzly_enable(libusb_device_handle* dev) {
 	grizzly_write_single_register(dev, ADDR_UPDATE, 0x00);
 	mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
 
+	grizzly_write_single_register(dev, ADDR_UPDATE, 0);
 	return mode & 0x01;
 }
 
@@ -427,6 +428,7 @@ void grizzly_disable(libusb_device_handle* dev) {
 	unsigned char mode = grizzly_read_single_register(dev, ADDR_MODE_RO);
 	mode &= (0xff - 0x01);
 	grizzly_write_single_register(dev, ADDR_MODE, mode);
+	grizzly_write_single_register(dev, ADDR_UPDATE, 0);
 }
 
 /**

@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <libusb-1.0/libusb.h>
-#include "include/libgrizzly.h"
+#include "libgrizzly.h"
 
 int main(void) {
 	libusb_context* ctx = NULL;
