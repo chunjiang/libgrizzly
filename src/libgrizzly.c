@@ -85,7 +85,6 @@ int grizzly_exchange_bytes(libusb_device_handle* dev, unsigned char* cmd, unsign
 ssize_t get_all_grizzlies(libusb_context* ctx, libusb_device_handle** handles) {
 	libusb_device **list;
 	ssize_t cnt = libusb_get_device_list(ctx, &list);
-	printf("%d Devices\n", (int)cnt);
 
 	ssize_t grizzly_count = 0, i;
 	for (i = 0; i < cnt; ++i) {
@@ -99,15 +98,11 @@ ssize_t get_all_grizzlies(libusb_context* ctx, libusb_device_handle** handles) {
 
 			err = 0;
 			err = libusb_detach_kernel_driver(current_handle, 0);
-			if (err) {
-				printf("Failed to detach kernel driver\n");
-			}
 
 			handles[grizzly_count++] = current_handle;
 		}
 	}
 	//Clean up usb devices we won't be using.
-	printf("%d Grizzlies detected\n", (int)grizzly_count);
 	libusb_free_device_list(list, 1);
 	return grizzly_count;
 }
