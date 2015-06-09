@@ -295,7 +295,7 @@ void grizzly_set_mode(libusb_device_handle* dev, char cmode, char dmode) {
  */
 float grizzly_read_current(libusb_device_handle* dev) {
 	int raw_adc = grizzly_read_as_int(dev, ADDR_MOTORCURRENT, 2);
-	return (5.0 / 1024.0) * (1000.0 / 66.0) * (raw_adc - 511);
+	return grizzly_adc_to_amps(raw_adc);
 }
 
 /**
@@ -339,14 +339,22 @@ void grizzly_limit_acceleration(libusb_device_handle* dev, int new_val) {
  * @param dev The device to set the current limit of.
  * @param new_val The new value of current limit to set in amps.
  */
-void grizzly_limit_current(libusb_device_handle* dev, int new_val) {
+void grizzly_limit_current(libusb_device_handle* dev, float new_val) {
 	if (new_val <= 0) {
 		printf("Current limit must be a positive number. Clamping value to 0.");
 		new_val = 0;
 	}
 
-	int adc_val = (int)(new_val * (1024.0 / 5.0) * (66.0 / 1000.0));
+	int adc_val = grizzly_amps_to_adc(new_val);
 	grizzly_write_as_int(dev, ADDR_CURRENTLIMIT, adc_val, 2);
+}
+
+float grizzly_adc_to_amps(int raw_adc) {
+	return (5.0 / 1024.0) * (1000.0 / 66.0) * (raw_adc - 511);
+}
+
+int grizzly_amps_to_adc(float amps) {
+	return (int)(amps * (1024.0 / 5.0) * (66.0 / 1000.0));
 }
 
 /**
